@@ -30,6 +30,8 @@ class Chatbot():
         except Exception as ex:
             if ex.code == "insufficient_quota":
                 answer = "죄송해요! API키 사용량 터졌어요!"
+            else:
+                answer = ex.code
         else:
             answer = response.choices[0].message.content
         return answer
@@ -50,19 +52,24 @@ class Chatbot():
         history.append((msg, answer))
         return answer
 
-    def eval_test(self, my_ai_ans, true_ans):
-        msg = f'{my_ai_ans}, 이건 내가 쓴 답이고, {true_ans}, 이건 정답이야 내가 쓴 답을 채점해서 맞으면 1 틀리면 0 을 보내줘. 모르겠어요는 틀린거야.'
+    def eval_test(self, question, answer, test, result):
+        test_paper = test(question)
+
+        msg = f'{test_paper}, 이건 내가 쓴 답이고, {answer}, 이건 정답이야 내가 쓴 답을 채점해서 맞으면 1 틀리면 0 을 보내줘. 모른다는건 틀린거야.'
 
         messages = self.__make_message(msg)
-        answer = self.__talk2gpt(messages)
+        evaluation = self.__talk2gpt(messages)
 
-        return answer
+        result[:] = (question, answer, test_paper, evaluation)
 
-    def test(self, question, chat_message):
-        prompt_message = [
-            {"role": "system", "content": f'너는 지금부터 시험을 볼 거야. 알려준 내용 안에서만 대답을 하고, 내용에 없는 부분이 시험 문제로 나오면 "모르겠어요"라고 대답해.'}]
+    def test(self, chat_message):
+        def inner(question):
+            prompt_message = [
+                {"role": "system", "content": f'너는 지금부터 시험을 볼 거야. 알려준 내용 안에서만 대답을 하고, 내용에 없는 부분이 시험 문제로 나오면 "모르겠어요"라고 대답해.'}]
 
-        messages = self.__make_message(question, chat_message, prompt_message)
-        answer = self.__talk2gpt(messages)
+            messages = self.__make_message(
+                question, chat_message, prompt_message)
+            answer = self.__talk2gpt(messages)
 
-        return answer
+            return answer
+        return inner

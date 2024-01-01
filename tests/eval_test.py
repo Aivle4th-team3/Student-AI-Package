@@ -1,5 +1,14 @@
 
-qs = [
+from threading import Thread
+from student_ai import Chatbot
+
+
+class DictAsAttribute:
+    def __init__(self, dictionary):
+        self.__dict__ = dictionary
+
+
+statements = [
     {
         'question': "정렬이란 무엇인가?",
         'answer': "정렬이란 어떤 기준에 따라 데이터를 나열하는 것을 말한다",
@@ -22,25 +31,37 @@ qs = [
         'answer': "재귀적인 방법으로 정렬을 해. 정렬되지 않은 데이터 리스트에서 데이터를 하나 골라, 이 데이터를 피벗이라고 해. 그리고 피벗과 비교해 기준에 따라 나머지 데이터를 분류해. 그러면 피벗은 정렬된 위치에 있게 되고, 피벗 옆에 정렬되지 않은 2개의 데이터 리스트가 생겨. 이 2개의 정렬되지 않은 데이터 리스트에 방금의 방법을 계속 적용하면 정렬을 할 수 있어."
     }
 ]
-keys = {}
+statements = list(map(DictAsAttribute, statements))
 
+chat_message = [
+    ["정렬이란 데이터의 집합을 어떠한 기준(핵심항목, key)의 대소관계를 따져 일정한 순서로 줄지어 세우는 것이야.정렬의 종류에는 가치 정렬, 극소 정렬, 극대 정렬이 있어.정렬은 건축에 사용할 수 있지.", "네"]
+]
+
+
+keys = {}
 with open('./key.config', 'r') as file:
     for line in file:
         key, value = line.split('=', 1)
         keys[key.strip()] = value.strip()
 
-from student_ai import Chatbot
 
 chatbot = Chatbot(keys['CHATGPT_API_KEY'].strip('\'"'))
 
-a = []
-for q in qs:
-    t = chatbot.test_ai(q["question"])
-    a.append(t)
-    print("답: ", t)
+# 결과 저장할 가변 리스트
+eval_results = [[0, 0, 0, 0] for i in range(len(statements))]
 
-checklist = []
-for my, q in zip(a, qs):
-    is_answer = chatbot.test_eval(my, q["answer"])
-    print('채점 결과: ', is_answer)
-    checklist.append(is_answer)
+# 쓰레딩
+threads = []
+for eval_result, statement in zip(eval_results, statements):
+    threads.append(Thread(target=chatbot.test_eval, args=(
+        statement.question, statement.answer, chatbot.test(chat_message), eval_result)))
+
+for th in threads:
+    th.start()
+for th in threads:
+    th.join()
+
+# 결과
+for er in eval_results:
+    print(*map(': '.join, zip(["문제", "답", "풀이", "정답 여부"], er)))
+checklist = [er[3] for er in eval_results]

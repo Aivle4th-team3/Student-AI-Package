@@ -71,9 +71,8 @@ class Chatbot():
             messages = self.__make_message(
                 question, chat_message, prompt_message)
             answer = self.__talk2gpt(messages)
-            answer_embedded = self.get_embedding(answer)
 
-            return answer_embedded
+            return answer
         return inner
 
     def get_embedding(self, text, model="text-embedding-ada-002"):

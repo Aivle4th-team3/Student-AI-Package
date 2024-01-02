@@ -1,5 +1,5 @@
 from openai import OpenAI
-from embedding import get_embedding
+
 
 class Chatbot():
     client = None
@@ -55,7 +55,8 @@ class Chatbot():
     def eval_test(self, question, answer, test, result):
         test_paper = test(question)
 
-        msg = f'{test_paper}, 이건 내가 쓴 답이고, {answer}, 이건 정답이야 내가 쓴 답을 채점해서 맞으면 1 틀리면 0 을 보내줘. 모른다는건 틀린거야.'
+        msg = f'{test_paper}, 이건 내가 쓴 답이고, {
+            answer}, 이건 정답이야 내가 쓴 답을 채점해서 맞으면 1 틀리면 0 을 보내줘. 모른다는건 틀린거야.'
 
         messages = self.__make_message(msg)
         evaluation = self.__talk2gpt(messages)
@@ -70,7 +71,11 @@ class Chatbot():
             messages = self.__make_message(
                 question, chat_message, prompt_message)
             answer = self.__talk2gpt(messages)
-            answer_embedded = get_embedding(answer)
+            answer_embedded = self.get_embedding(answer)
 
             return answer_embedded
         return inner
+
+    def get_embedding(self, text, model="text-embedding-ada-002"):
+        text = text.replace("\n", " ")
+        return self.client.embeddings.create(input=[text], model=model).data[0].embedding

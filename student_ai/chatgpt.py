@@ -1,5 +1,5 @@
 from openai import OpenAI
-
+from embedding import get_embedding
 
 class Chatbot():
     client = None
@@ -70,6 +70,7 @@ class Chatbot():
             messages = self.__make_message(
                 question, chat_message, prompt_message)
             answer = self.__talk2gpt(messages)
+            answer_embedded = get_embedding(answer)
 
-            return answer
+            return answer_embedded
         return inner

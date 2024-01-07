@@ -1,4 +1,5 @@
 from openai import OpenAI
+import numpy as np
 
 
 class Chatbot():
@@ -64,11 +65,27 @@ class Chatbot():
 
     def test(self, chat_message):
         def inner(question):
+            # history로 사용될 메시지
+            selected_messages = []
+            # 러프한 길이 제한
+            LEN_LIMIT = 10000
+
+            question_embedded = self.get_embedding(question)
+            if chat_message:
+                embedded_user_vectors = np.array([msg.user_message_embedded for msg in chat_message])
+                descent_idx = np.argsort(np.dot(embedded_user_vectors, question_embedded))[::-1]
+                len_count = 0
+                for idx in descent_idx:
+                    if len_count < LEN_LIMIT:
+                        current_message = chat_message[idx.item()]
+                        selected_messages.append((current_message.user_message, current_message.bot_message))
+                        len_count += (len(current_message.user_message) + len(current_message.bot_message))
+
             prompt_message = [
                 {"role": "system", "content": f'너는 지금부터 시험을 볼 거야. 알려준 내용 안에서만 대답을 하고, 내용에 없는 부분이 시험 문제로 나오면 "모르겠어요"라고 대답해.'}]
 
             messages = self.__make_message(
-                question, chat_message, prompt_message)
+                question, selected_messages, prompt_message)
             answer = self.__talk2gpt(messages)
 
             return answer

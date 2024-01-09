@@ -54,9 +54,22 @@ class Chatbot():
         return answer
 
     def eval_test(self, question, answer, test, result):
-        test_paper = test(question)
+        # test_paper = test(question)
+        test_paper = '데이터를 특정한 기준에 따라 나열하는 걸 말한다'
 
-        msg = f'{test_paper}, 이건 내가 쓴 답이고, {answer}, 이건 정답이야 내가 쓴 답을 채점해서 맞으면 1 틀리면 0 을 보내줘. 모른다는건 틀린거야.'
+        msg = f'''점수와 피드백 부분을 채워줘
+        문제: 반복문이란 무엇인가?
+        풀이: 반복문은 반복하는 명령문이다.
+        답: 반복문이란 프로그램 내에서 똑같은 명령을 일정 횟수만큼 반복하여 수행하도록 제어하는 명령문입니다.
+        점수와 피드백: 70, 설명이 빈약합니다.
+        문제: 샤이니의 멤버 구성은 어떻게 되는가?
+        풀이: 샤이니는 온유, 정찬, 키, 인호 4명으로 이루어진 4인조 그룹입니다.
+        답: 샤이니는 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
+        점수와 피드백: 40, 샤이니는 4인조 그룹이 아닌 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
+        문제: {question}
+        풀이: {test_paper}
+        답: {answer}
+        점수와 피드백: '''
 
         messages = self.__make_message(msg)
         evaluation = self.__talk2gpt(messages)
@@ -94,3 +107,8 @@ class Chatbot():
     def get_embedding(self, text, model="text-embedding-ada-002"):
         text = text.replace("\n", " ")
         return self.client.embeddings.create(input=[text], model=model).data[0].embedding
+
+result = [[0, 0, 0, 0]]
+bot = Chatbot(api_key='')
+bot.eval_test('정렬이란 무엇인가?', '정렬이란 어떤 기준에 따라 데이터를 나열하는 것을 말한다', bot.test([]), result)
+print(result)

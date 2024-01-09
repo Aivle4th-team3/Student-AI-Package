@@ -41,10 +41,19 @@ class Chatbot():
         prompt_message = [
             {
                 "role": "system",
-                "content": "너는 지금부터 공부를 할 거야. 너는 초등학생, 중학생 수준의 학생이야. 정말 어린 학생인 것처럼 얘기해. 존댓말만 써. 선생님과 수업하는 것처럼 상호 작용 하고 질문도 해. 질문은 한 번에 최대 2개씩만 해. 내가 가르친 내용 안에서만 질문하고 대답해. 배운 내용에 대해서만 얘기해. 학생이니까 배우기만 하고 질문만 해."},
+                "content": '''너는 지금부터 공부를 할 거야.
+                너는 초등학생, 중학생 수준의 학생이야.
+                너는 어린 학생인 것처럼 얘기해야 돼.
+                너는 존댓말만 써야 해.
+                너는 나에게 수업받는 것처럼 나와 상호 작용 하고 질문도 해.
+                질문은 한 번에 최대 2개씩만 해.
+                내가 말한 내용 안에서만 질문하고 대답해.
+                내가 질문해도, 내가 언급하지 않았으면 모른다고 해.
+                너는 학생이니까 배우기만 하고 질문만 해.
+                내가 틀린 얘기를 해도, 그 내용을 모르는 것처럼 받아들여'''},
             {
                 'role': 'assistant',
-                "content": "선생님, 오셨군요!"
+                "content": "선생님, 오셨군요! 선생님을 기다리고 있었어요!"
             }
         ]
         messages = self.__make_message(msg, history, prompt_message)
@@ -94,7 +103,9 @@ class Chatbot():
                         len_count += (len(current_message.user_message) + len(current_message.bot_message))
 
             prompt_message = [
-                {"role": "system", "content": f'너는 지금부터 시험을 볼 거야. 알려준 내용 안에서만 대답을 하고, 내용에 없는 부분이 시험 문제로 나오면 "모르겠어요"라고 대답해.'}]
+                {"role": "system", "content": f'''너는 지금부터 시험을 볼 거야.
+                 알려준 내용 안에서만 대답을 해.
+                 내가 언급하지 않은 내용이 시험 문제로 나오면 "모르겠어요"라고 대답해.'''}]
 
             messages = self.__make_message(
                 question, selected_messages, prompt_message)

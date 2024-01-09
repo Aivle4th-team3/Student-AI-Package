@@ -54,8 +54,7 @@ class Chatbot():
         return answer
 
     def eval_test(self, question, answer, test, result):
-        # test_paper = test(question)
-        test_paper = '데이터를 특정한 기준에 따라 나열하는 걸 말한다'
+        test_paper = test(question)
 
         msg = f'''점수와 피드백 부분을 채워줘
         문제: 반복문이란 무엇인가?
@@ -107,8 +106,3 @@ class Chatbot():
     def get_embedding(self, text, model="text-embedding-ada-002"):
         text = text.replace("\n", " ")
         return self.client.embeddings.create(input=[text], model=model).data[0].embedding
-
-result = [[0, 0, 0, 0]]
-bot = Chatbot(api_key='')
-bot.eval_test('정렬이란 무엇인가?', '정렬이란 어떤 기준에 따라 데이터를 나열하는 것을 말한다', bot.test([]), result)
-print(result)

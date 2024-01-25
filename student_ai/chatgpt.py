@@ -100,28 +100,37 @@ class Chatbot():
         bot_message_embedded = self.get_embedding(answer)
 
         return answer, embedded_message, bot_message_embedded
+    
+    def eval(self, test):
+        def inner(question, answer):
+            test_paper = test(question)
 
-    def eval_test(self, question, answer, test, result):
-        test_paper = test(question)
+            msg = f'''점수와 피드백 부분을 채워줘. 점수는 100점 만점으로 해줘.
+            문제: 반복문이란 무엇인가?
+            풀이: 반복문은 반복하는 명령문이다.
+            답: 반복문이란 프로그램 내에서 똑같은 명령을 일정 횟수만큼 반복하여 수행하도록 제어하는 명령문입니다.
+            점수와 피드백: 70:설명이 빈약합니다.
+            문제: 샤이니의 멤버 구성은 어떻게 되는가?
+            풀이: 샤이니는 온유, 정찬, 키, 인호 4명으로 이루어진 4인조 그룹입니다.
+            답: 샤이니는 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
+            점수와 피드백: 40:샤이니는 4인조 그룹이 아닌 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
+            문제: {question}
+            풀이: {test_paper}
+            답: {answer}
+            점수와 피드백: '''
 
-        msg = f'''점수와 피드백 부분을 채워줘. 점수는 100점 만점으로 해줘.
-        문제: 반복문이란 무엇인가?
-        풀이: 반복문은 반복하는 명령문이다.
-        답: 반복문이란 프로그램 내에서 똑같은 명령을 일정 횟수만큼 반복하여 수행하도록 제어하는 명령문입니다.
-        점수와 피드백: 70:설명이 빈약합니다.
-        문제: 샤이니의 멤버 구성은 어떻게 되는가?
-        풀이: 샤이니는 온유, 정찬, 키, 인호 4명으로 이루어진 4인조 그룹입니다.
-        답: 샤이니는 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
-        점수와 피드백: 40:샤이니는 4인조 그룹이 아닌 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
-        문제: {question}
-        풀이: {test_paper}
-        답: {answer}
-        점수와 피드백: '''
+            messages = self.__capsule_message(msg)
+            evaluation = self.__talk2gpt(messages)
 
-        messages = self.__make_message(msg)
-        evaluation = self.__talk2gpt(messages)
+            idx = evaluation.find(':')
+            try:
+                if idx==-1: raise
+                point, explain = int(evaluation[:idx]), evaluation[idx+1:]
+            except:
+                point, explain = 0, "응답 오류"
 
-        result[:] = (question, answer, test_paper, evaluation)
+            return point, explain, test_paper, question, answer
+        return inner
 
     def test(self, chat_message):
         def inner(question):
@@ -146,7 +155,7 @@ class Chatbot():
                  사용자가 말한 내용 안에서만 대답을 해.
                  사용자가 언급하지 않은 내용이 시험 문제로 나오면 "모르겠어요"라고 대답해.'''}]
 
-            messages = self.__make_message(
+            messages = self.__capsule_message(
                 question, selected_messages, prompt_message)
             answer = self.__talk2gpt(messages)
 

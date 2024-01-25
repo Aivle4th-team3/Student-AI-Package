@@ -5,7 +5,8 @@ import numpy as np
 class Chatbot():
     client = None
 
-    def __init__(self, api_key):
+    def __init__(self, api_key, is_test=False):
+        self.is_test = is_test
         self.client = OpenAI(api_key=api_key)
 
     def __capsule_message(self, msg, history=[], prompt_message=[]):
@@ -22,20 +23,23 @@ class Chatbot():
         return messages
 
     def __talk2gpt(self, messages):
-        try:
-            response = self.client.chat.completions.create(
-                model="gpt-4",
-                messages=messages,
-                temperature=0.5,
-            )
-        except Exception as ex:
-            if ex.code == "insufficient_quota":
-                answer = "죄송해요! API키 사용량 터졌어요!"
+        if not self.is_test:
+            try:
+                response = self.client.chat.completions.create(
+                    model="gpt-4",
+                    messages=messages,
+                    temperature=0.5,
+                )
+            except Exception as ex:
+                if ex.code == "insufficient_quota":
+                    answer = "죄송해요! API키 사용량 터졌어요!"
+                else:
+                    answer = ex.code
             else:
-                answer = ex.code
+                answer = response.choices[0].message.content
+            return answer
         else:
-            answer = response.choices[0].message.content
-        return answer
+            return "테스트입니다."
     
     def __measure_similarity(self, messages, target_vector):
         print("that", messages, target_vector)

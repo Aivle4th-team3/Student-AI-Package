@@ -41,12 +41,10 @@ class Chatbot():
         else:
             return "테스트입니다."
     
+    # 코사인 유사도 비교
     def __measure_similarity(self, messages, target_vector):
-        print("that", messages, target_vector)
         embedded_history = np.array([msg.user_message_embedded for msg in messages])
-        # 코사인 유사도 비교
         # 각 임베딩된 벡터의 크기가 1이므로 분모 생략
-        print("here",embedded_history, target_vector)
         cosine_similarity = np.dot(embedded_history, target_vector)
 
         return cosine_similarity
@@ -68,7 +66,7 @@ class Chatbot():
 
         return selected_messages
 
-    def chat(self, message, history):
+    def chat(self, message, history, prompt_message=None):
         prompt_message = [
             {
                 "role": "system",
@@ -83,7 +81,7 @@ class Chatbot():
                 'role': 'assistant',
                 "content": "선생님, 오셨군요! 선생님을 기다리고 있었어요!"
             }
-        ]
+        ] if not prompt_message else prompt_message
 
 
         # 메시지 임베딩 벡터화
@@ -132,33 +130,14 @@ class Chatbot():
             return point, explain, test_paper, question, answer
         return inner
 
-    def test(self, chat_message):
+    def test(self, history):
+        prompt_message = [
+            {"role": "system", "content": f'''너는 지금부터 사용자가 말해준 내용으로 시험을 보는 학생 ai 야.
+                사용자가 말한 내용 안에서만 대답을 해.
+                사용자가 언급하지 않은 내용이 시험 문제로 나오면 "모르겠어요"라고 대답해.'''}]
+
         def inner(question):
-            # history로 사용될 메시지
-            selected_messages = []
-            # 러프한 길이 제한
-            LEN_LIMIT = 10000
-
-            question_embedded = self.get_embedding(question)
-            if chat_message:
-                embedded_user_vectors = np.array([msg.user_message_embedded for msg in chat_message])
-                descent_idx = np.argsort(np.dot(embedded_user_vectors, question_embedded))[::-1]
-                len_count = 0
-                for idx in descent_idx:
-                    if len_count < LEN_LIMIT:
-                        current_message = chat_message[idx.item()]
-                        selected_messages.append((current_message.user_message, current_message.bot_message))
-                        len_count += (len(current_message.user_message) + len(current_message.bot_message))
-
-            prompt_message = [
-                {"role": "system", "content": f'''너는 지금부터 사용자가 말해준 내용으로 시험을 보는 학생 ai 야.
-                 사용자가 말한 내용 안에서만 대답을 해.
-                 사용자가 언급하지 않은 내용이 시험 문제로 나오면 "모르겠어요"라고 대답해.'''}]
-
-            messages = self.__capsule_message(
-                question, selected_messages, prompt_message)
-            answer = self.__talk2gpt(messages)
-
+            answer, _, _ = self.chat(question, history, prompt_message)
             return answer
         return inner
 

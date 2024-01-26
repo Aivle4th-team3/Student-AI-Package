@@ -23,8 +23,10 @@ class Chatbot():
         messages = []
 
         for h in history:
-            messages.append({"role": "user", "content": h[0]})
-            messages.append({"role": "assistant", "content": h[1]})
+            if h[1] == 'sender':
+                messages.append({"role": "user", "content": h[0]})
+            else:
+                messages.append({"role": "assistant", "content": h[0]})
 
         for m in prompt_message:
             messages.append(m)
@@ -53,7 +55,8 @@ class Chatbot():
 
     # 코사인 유사도 비교
     def __measure_similarity(self, exchanges, target_vector):
-        embedded_history = np.array([exchange.sender_vector for exchange in exchanges])
+        embedded_history = np.array([exchange.sender_vector for exchange in exchanges] + [
+                                    exchange.reciver_vector for exchange in exchanges])
         # 각 임베딩된 벡터의 크기가 1이므로 분모 생략
         cosine_similarity = np.dot(embedded_history, target_vector)
 
@@ -68,11 +71,13 @@ class Chatbot():
         # 유사도 높은 순서로 선택하려고 뒤집음
         descent_idx = np.argsort(cosine_similarity)[::-1]
         len_count = 0
+        texts = [exchange.sender_text for exchange in exchanges] + [exchange.reciver_text for exchange in exchanges]
         for idx in descent_idx:
             if len_count < LEN_LIMIT:
-                current_message = exchanges[idx.item()]
-                selected_messages.append((current_message.sender_text, current_message.reciver_text))
-                len_count += (len(current_message.sender_text) + len(current_message.reciver_text))
+                current_message = texts[idx]
+                is_sender_message = idx < len(texts)//2
+                selected_messages.append((current_message, 'sender' if is_sender_message else 'reciver'))
+                len_count += len(current_message)
 
         return selected_messages
 

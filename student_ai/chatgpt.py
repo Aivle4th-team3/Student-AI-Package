@@ -1,5 +1,15 @@
 from openai import OpenAI
 import numpy as np
+from dataclasses import dataclass
+from typing import List
+
+
+@dataclass
+class Exchange():
+    sender_text: str
+    sender_vector: List[int]
+    reciver_text: str
+    reciver_vector: List[int]
 
 
 class Chatbot():
@@ -40,16 +50,16 @@ class Chatbot():
             return answer
         else:
             return "테스트입니다."
-    
+
     # 코사인 유사도 비교
-    def __measure_similarity(self, messages, target_vector):
-        embedded_history = np.array([msg.user_message_embedded for msg in messages])
+    def __measure_similarity(self, exchanges, target_vector):
+        embedded_history = np.array([exchange.sender_vector for exchange in exchanges])
         # 각 임베딩된 벡터의 크기가 1이므로 분모 생략
         cosine_similarity = np.dot(embedded_history, target_vector)
 
         return cosine_similarity
-    
-    def __filter_messages(self, messages, cosine_similarity):
+
+    def __filter_messages(self, exchanges, cosine_similarity):
         # 챗봇에 기억 저장소 역할로 보내줄 메시지
         selected_messages = []
         # 러프한 길이 제한
@@ -60,13 +70,13 @@ class Chatbot():
         len_count = 0
         for idx in descent_idx:
             if len_count < LEN_LIMIT:
-                current_message = messages[idx.item()]
-                selected_messages.append((current_message.user_message, current_message.bot_message))
-                len_count += (len(current_message.user_message) + len(current_message.bot_message))
+                current_message = exchanges[idx.item()]
+                selected_messages.append((current_message.sender_text, current_message.reciver_text))
+                len_count += (len(current_message.sender_text) + len(current_message.reciver_text))
 
         return selected_messages
 
-    def chat(self, message, history, prompt_message=None):
+    def chat(self, message, exchanges, prompt_message=None):
         prompt_message = [
             {
                 "role": "system",
@@ -83,13 +93,12 @@ class Chatbot():
             }
         ] if not prompt_message else prompt_message
 
-
         # 메시지 임베딩 벡터화
         embedded_message = self.get_embedding(message)
 
-        if history:
-            cosine_similarity = self.__measure_similarity(history, embedded_message)
-            selected_messages = self.__filter_messages(history, cosine_similarity)
+        if exchanges:
+            cosine_similarity = self.__measure_similarity(exchanges, embedded_message)
+            selected_messages = self.__filter_messages(exchanges, cosine_similarity)
         else:
             selected_messages = []
         capsuled_messages = self.__capsule_message(message, selected_messages, prompt_message)
@@ -98,7 +107,7 @@ class Chatbot():
         bot_message_embedded = self.get_embedding(answer)
 
         return answer, embedded_message, bot_message_embedded
-    
+
     def eval(self, test):
         def inner(question, answer):
             test_paper = test(question)
@@ -130,14 +139,14 @@ class Chatbot():
             return point, explain, test_paper, question, answer
         return inner
 
-    def test(self, history):
+    def test(self, exchanges):
         prompt_message = [
             {"role": "system", "content": f'''너는 지금부터 사용자가 말해준 내용으로 시험을 보는 학생 ai 야.
                 사용자가 말한 내용 안에서만 대답을 해.
                 사용자가 언급하지 않은 내용이 시험 문제로 나오면 "모르겠어요"라고 대답해.'''}]
 
         def inner(question):
-            answer, _, _ = self.chat(question, history, prompt_message)
+            answer, _, _ = self.chat(question, exchanges, prompt_message)
             return answer
         return inner
 

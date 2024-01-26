@@ -1,15 +1,18 @@
 from openai import OpenAI
 import numpy as np
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple, Dict, Callable
+
+
+Vector = List[float]
 
 
 @dataclass
 class Exchange():
     sender_text: str
-    sender_vector: List[int]
-    reciver_text: str
-    reciver_vector: List[int]
+    sender_vector: Vector
+    receiver_text: str
+    receiver_vector: Vector
 
 
 class Chatbot():
@@ -19,7 +22,7 @@ class Chatbot():
         self.is_test = is_test
         self.client = OpenAI(api_key=api_key)
 
-    def __capsule_message(self, msg, history=[], prompt_message=[]):
+    def __capsule_message(self, query: str, history: List[Tuple[str, str]] = [], prompt_messages=[]) -> List[Dict]:
         messages = []
 
         for h in history:
@@ -28,13 +31,12 @@ class Chatbot():
             else:
                 messages.append({"role": "assistant", "content": h[0]})
 
-        for m in prompt_message:
-            messages.append(m)
+        messages.extend(prompt_messages)
 
-        messages.append({"role": "user", "content": msg})
+        messages.append({"role": "user", "content": query})
         return messages
 
-    def __talk2gpt(self, messages):
+    def __talk2gpt(self, messages: List[Dict]) -> str:
         if not self.is_test:
             try:
                 response = self.client.chat.completions.create(
@@ -54,35 +56,36 @@ class Chatbot():
             return "테스트입니다."
 
     # 코사인 유사도 비교
-    def __measure_similarity(self, exchanges, target_vector):
-        embedded_history = np.array([exchange.sender_vector for exchange in exchanges] + [
-                                    exchange.reciver_vector for exchange in exchanges])
+    def __measure_similarity(self, chat_log: List[Exchange], target_vector: Vector) -> Vector:
+        embedded_history = np.array([exchange.sender_vector for exchange in chat_log] + [
+                                    exchange.receiver_vector for exchange in chat_log])
         # 각 임베딩된 벡터의 크기가 1이므로 분모 생략
         cosine_similarity = np.dot(embedded_history, target_vector)
 
         return cosine_similarity
 
-    def __filter_messages(self, exchanges, cosine_similarity):
+    def __filter_messages(self, chat_log: List[Exchange], cosine_similarity: Vector) -> List[Tuple[str, str]]:
         # 챗봇에 기억 저장소 역할로 보내줄 메시지
-        selected_messages = []
+        selected = []
         # 러프한 길이 제한
         LEN_LIMIT = 10000
 
         # 유사도 높은 순서로 선택하려고 뒤집음
-        descent_idx = np.argsort(cosine_similarity)[::-1]
+        descent_indices = np.argsort(cosine_similarity)[::-1]
         len_count = 0
-        texts = [exchange.sender_text for exchange in exchanges] + [exchange.reciver_text for exchange in exchanges]
-        for idx in descent_idx:
+        texts = [exchange.sender_text for exchange in chat_log] + \
+                [exchange.receiver_text for exchange in chat_log]
+        for idx in descent_indices:
             if len_count < LEN_LIMIT:
                 current_message = texts[idx]
                 is_sender_message = idx < len(texts)//2
-                selected_messages.append((current_message, 'sender' if is_sender_message else 'reciver'))
+                selected.append((current_message, 'sender' if is_sender_message else 'receiver'))
                 len_count += len(current_message)
 
-        return selected_messages
+        return selected
 
-    def chat(self, message, exchanges, prompt_message=None):
-        prompt_message = [
+    def chat(self, query: str, chat_log: List[Exchange], prompt_messages=None) -> Tuple[str, Vector, Vector]:
+        prompt_messages = [
             {
                 "role": "system",
                 "content": '''너는 지금부터 사용자에게 공부를 배우는 학생 ai 야,
@@ -96,28 +99,32 @@ class Chatbot():
                 'role': 'assistant',
                 "content": "선생님, 오셨군요! 선생님을 기다리고 있었어요!"
             }
-        ] if not prompt_message else prompt_message
+        ] if not prompt_messages else prompt_messages
 
         # 메시지 임베딩 벡터화
-        embedded_message = self.get_embedding(message)
+        query_vector = self.get_embedding(query)
 
-        if exchanges:
-            cosine_similarity = self.__measure_similarity(exchanges, embedded_message)
-            selected_messages = self.__filter_messages(exchanges, cosine_similarity)
+        # 사전 기억 중 선별
+        if chat_log:
+            cosine_similarity = self.__measure_similarity(chat_log, query_vector)
+            selected_messages = self.__filter_messages(chat_log, cosine_similarity)
         else:
             selected_messages = []
-        capsuled_messages = self.__capsule_message(message, selected_messages, prompt_message)
+
+        # gpt 입력 포맷으로 캡슐화
+        capsuled_messages = self.__capsule_message(query, selected_messages, prompt_messages)
+
+        # 질의 응답
         answer = self.__talk2gpt(capsuled_messages)
+        answer_vector = self.get_embedding(answer)
 
-        bot_message_embedded = self.get_embedding(answer)
+        return answer, query_vector, answer_vector
 
-        return answer, embedded_message, bot_message_embedded
-
-    def eval(self, test):
-        def inner(question, answer):
+    def eval(self, test: Callable) -> Callable:
+        def inner(question: str, answer: str) -> Tuple[int, str, str, str, str]:
             test_paper = test(question)
 
-            msg = f'''점수와 피드백 부분을 채워줘. 점수는 100점 만점으로 해줘.
+            text = f'''점수와 피드백 부분을 채워줘. 점수는 100점 만점으로 해줘.
             문제: 반복문이란 무엇인가?
             풀이: 반복문은 반복하는 명령문이다.
             답: 반복문이란 프로그램 내에서 똑같은 명령을 일정 횟수만큼 반복하여 수행하도록 제어하는 명령문입니다.
@@ -131,12 +138,13 @@ class Chatbot():
             답: {answer}
             점수와 피드백: '''
 
-            messages = self.__capsule_message(msg)
-            evaluation = self.__talk2gpt(messages)
+            capsuled_messages = self.__capsule_message(text)
+            evaluation = self.__talk2gpt(capsuled_messages)
 
             idx = evaluation.find(':')
             try:
-                if idx==-1: raise
+                if idx == -1:
+                    raise
                 point, explain = int(evaluation[:idx]), evaluation[idx+1:]
             except:
                 point, explain = 0, "응답 오류"
@@ -144,17 +152,17 @@ class Chatbot():
             return point, explain, test_paper, question, answer
         return inner
 
-    def test(self, exchanges):
-        prompt_message = [
+    def test(self, chat_log: List[Exchange]) -> Callable:
+        prompt_messages = [
             {"role": "system", "content": f'''너는 지금부터 사용자가 말해준 내용으로 시험을 보는 학생 ai 야.
                 사용자가 말한 내용 안에서만 대답을 해.
                 사용자가 언급하지 않은 내용이 시험 문제로 나오면 "모르겠어요"라고 대답해.'''}]
 
-        def inner(question):
-            answer, _, _ = self.chat(question, exchanges, prompt_message)
+        def inner(question: str) -> str:
+            answer, _, _ = self.chat(question, chat_log, prompt_messages)
             return answer
         return inner
 
-    def get_embedding(self, text, model="text-embedding-ada-002"):
+    def get_embedding(self, text: str, model="text-embedding-ada-002") -> Vector:
         text = text.replace("\n", " ")
         return self.client.embeddings.create(input=[text], model=model).data[0].embedding

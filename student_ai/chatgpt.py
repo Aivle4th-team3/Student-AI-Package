@@ -30,11 +30,9 @@ class Chatbot():
         )
         self.embeddings_model = OpenAIEmbeddings(api_key=api_key)
 
-    def __talk2gpt(self, templates: List[PromptTemplate], placeholder) -> str:
+    def __talk2gpt(self, templates: List[PromptTemplate], placeholder, output_parser=StrOutputParser()) -> str:
         if not self.is_test:
             try:
-                # 문자열로 출력 파서
-                output_parser = StrOutputParser()
                 # 체이닝
                 chain = templates | self.llm | output_parser
                 # 질의 응답
@@ -72,14 +70,14 @@ class Chatbot():
             if len_count < LEN_LIMIT:
                 text = texts[idx]
                 is_sender_message = idx < len(texts)//2
-                
+
                 selected.append(('human' if is_sender_message else 'ai', text))
                 len_count += len(text)
 
         return selected
 
     # HumanMessage 또는 AIMessage로 분리, 캡슐화
-    def __capsule_messages(self, role_messages: List[Tuple[str, str]]) -> List[BaseMessage]:    
+    def __capsule_messages(self, role_messages: List[Tuple[str, str]]) -> List[BaseMessage]:
         messages = [HumanMessage(text) if role == 'human' else AIMessage(text) for role, text in role_messages]
         return messages
 
@@ -123,36 +121,46 @@ class Chatbot():
 
         return answer, query_vector, answer_vector
 
+    def __evaluation_parser(self, ai_message: AIMessage) -> str:
+        evaluation = ai_message.content
+
+        idx = evaluation.find(':')
+        try:
+            if idx == -1:
+                raise
+            point, explain = int(evaluation[:idx]), evaluation[idx+1:]
+        except:
+            point, explain = 0, "응답 오류"
+
+        return point, explain
+
     def eval(self, test: Callable) -> Callable:
+        instruction = '''점수와 피드백 부분을 채워줘. 점수는 100점 만점으로 해줘.
+        문제: 반복문이란 무엇인가?
+        풀이: 반복문은 반복하는 명령문이다.
+        답: 반복문이란 프로그램 내에서 똑같은 명령을 일정 횟수만큼 반복하여 수행하도록 제어하는 명령문입니다.
+        점수와 피드백: 70:설명이 빈약합니다.
+        문제: 샤이니의 멤버 구성은 어떻게 되는가?
+        풀이: 샤이니는 온유, 정찬, 키, 인호 4명으로 이루어진 4인조 그룹입니다.
+        답: 샤이니는 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
+        점수와 피드백: 40:샤이니는 4인조 그룹이 아닌 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
+        문제: {question}
+        풀이: {test_paper}
+        답: {answer}
+        점수와 피드백: '''
+
         def inner(question: str, answer: str) -> Tuple[int, str, str, str, str]:
             test_paper = test(question)
-
-            instruction = '''점수와 피드백 부분을 채워줘. 점수는 100점 만점으로 해줘.
-            문제: 반복문이란 무엇인가?
-            풀이: 반복문은 반복하는 명령문이다.
-            답: 반복문이란 프로그램 내에서 똑같은 명령을 일정 횟수만큼 반복하여 수행하도록 제어하는 명령문입니다.
-            점수와 피드백: 70:설명이 빈약합니다.
-            문제: 샤이니의 멤버 구성은 어떻게 되는가?
-            풀이: 샤이니는 온유, 정찬, 키, 인호 4명으로 이루어진 4인조 그룹입니다.
-            답: 샤이니는 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
-            점수와 피드백: 40:샤이니는 4인조 그룹이 아닌 온유, 종현, 키, 민호, 태민 5명으로 이루어진 5인조 그룹입니다.
-            문제: {question}
-            풀이: {test_paper}
-            답: {answer}
-            점수와 피드백: '''
 
             # 프롬프트 템플릿
             chat_prompt = ChatPromptTemplate.from_template(instruction)
             # 질의 응답
-            evaluation = self.__talk2gpt(chat_prompt, {'question': question, 'test_paper': test_paper, 'answer': answer})
-
-            idx = evaluation.find(':')
-            try:
-                if idx == -1:
-                    raise
-                point, explain = int(evaluation[:idx]), evaluation[idx+1:]
-            except:
-                point, explain = 0, "응답 오류"
+            point, explain = self.__talk2gpt(
+                templates=chat_prompt,
+                placeholder={
+                    'question': question, 'test_paper': test_paper, 'answer': answer},
+                output_parser=self.__evaluation_parser
+            )
 
             return point, explain, test_paper, question, answer
         return inner

@@ -1,4 +1,7 @@
-from openai import OpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, HumanMessagePromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 import numpy as np
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Callable
@@ -20,37 +23,27 @@ class Chatbot():
 
     def __init__(self, api_key, is_test=False):
         self.is_test = is_test
-        self.client = OpenAI(api_key=api_key)
+        self.llm = ChatOpenAI(
+            api_key=api_key,
+            model='gpt-4',
+            temperature=0.5,
+        )
+        self.embeddings_model = OpenAIEmbeddings(api_key=api_key)
 
-    def __capsule_message(self, query: str, history: List[Tuple[str, str]] = [], prompt_messages=[]) -> List[Dict]:
-        messages = []
-
-        for h in history:
-            if h[1] == 'sender':
-                messages.append({"role": "user", "content": h[0]})
-            else:
-                messages.append({"role": "assistant", "content": h[0]})
-
-        messages.extend(prompt_messages)
-
-        messages.append({"role": "user", "content": query})
-        return messages
-
-    def __talk2gpt(self, messages: List[Dict]) -> str:
+    def __talk2gpt(self, templates: List[PromptTemplate], placeholder) -> str:
         if not self.is_test:
             try:
-                response = self.client.chat.completions.create(
-                    model="gpt-4",
-                    messages=messages,
-                    temperature=0.5,
-                )
+                # 문자열로 출력 파서
+                output_parser = StrOutputParser()
+                # 체이닝
+                chain = templates | self.llm | output_parser
+                # 질의 응답
+                answer = chain.invoke(placeholder)
             except Exception as ex:
                 if ex.code == "insufficient_quota":
                     answer = "죄송해요! API키 사용량 터졌어요!"
                 else:
                     answer = ex.code
-            else:
-                answer = response.choices[0].message.content
             return answer
         else:
             return "테스트입니다."
@@ -77,46 +70,56 @@ class Chatbot():
                 [exchange.receiver_text for exchange in chat_log]
         for idx in descent_indices:
             if len_count < LEN_LIMIT:
-                current_message = texts[idx]
+                text = texts[idx]
                 is_sender_message = idx < len(texts)//2
-                selected.append((current_message, 'sender' if is_sender_message else 'receiver'))
-                len_count += len(current_message)
+                
+                selected.append(('human' if is_sender_message else 'ai', text))
+                len_count += len(text)
 
         return selected
 
-    def chat(self, query: str, chat_log: List[Exchange], prompt_messages=None) -> Tuple[str, Vector, Vector]:
-        prompt_messages = [
-            {
-                "role": "system",
-                "content": '''너는 지금부터 사용자에게 공부를 배우는 학생 ai 야,
-                너는 초등학생, 중학생 정도의 어린 학생 ai 라서 사용자에게 존댓말만 써야 해.
-                너는 사용자에게 공부를 배우고 사용자에게 질문함으로써 상호작용할 거야,
-                질문은 한 번에 최대 2개씩만 해.
-                너는 학생 ai 니까 사용자가 말한 내용 안에서만 질문하고 대답해.
-                사용자가 질문해도, 학생 ai 이기 때문에 사용자에게 배운 내용이 아니면 모른다고 해야 돼.
-                사용자가 틀린 얘기를 해도, 너는 아는 게 적은 학생 ai 니까 그 말이 맞다고 믿어야 돼.'''},
-            {
-                'role': 'assistant',
-                "content": "선생님, 오셨군요! 선생님을 기다리고 있었어요!"
-            }
-        ] if not prompt_messages else prompt_messages
+    # HumanMessage 또는 AIMessage로 분리, 캡슐화
+    def __capsule_messages(self, role_messages: List[Tuple[str, str]]) -> List[BaseMessage]:    
+        messages = [HumanMessage(text) if role == 'human' else AIMessage(text) for role, text in role_messages]
+        return messages
 
-        # 메시지 임베딩 벡터화
-        query_vector = self.get_embedding(query)
-
-        # 사전 기억 중 선별
+    def __select_context(self, chat_log: List[Exchange], query_vector: Vector) -> List[BaseMessage]:
         if chat_log:
             cosine_similarity = self.__measure_similarity(chat_log, query_vector)
             selected_messages = self.__filter_messages(chat_log, cosine_similarity)
+            context_messages = self.__capsule_messages(selected_messages)
         else:
-            selected_messages = []
+            context_messages = []
 
-        # gpt 입력 포맷으로 캡슐화
-        capsuled_messages = self.__capsule_message(query, selected_messages, prompt_messages)
+        return context_messages
 
+    def chat(self, query: str, chat_log: List[Exchange], instruction=None) -> Tuple[str, Vector, Vector]:
+        instruction = '''너는 지금부터 사용자에게 공부를 배우는 학생 ai 야,
+        너는 초등학생, 중학생 정도의 어린 학생 ai 라서 사용자에게 존댓말만 써야 해.
+        너는 사용자에게 공부를 배우고 사용자에게 질문함으로써 상호작용할 거야,
+        질문은 한 번에 최대 2개씩만 해.
+        너는 학생 ai 니까 사용자가 말한 내용 안에서만 질문하고 대답해.
+        사용자가 질문해도, 학생 ai 이기 때문에 사용자에게 배운 내용이 아니면 모른다고 해야 돼.
+        사용자가 틀린 얘기를 해도, 너는 아는 게 적은 학생 ai 니까 그 말이 맞다고 믿어야 돼.
+        ''' if not instruction else instruction
+
+        # 시스템 설정
+        system_role = SystemMessage(content=instruction)
+
+        # 메시지 임베딩 벡터화
+        query_vector = self.embeddings_model.embed_query(query)
+        # 사전 기억 중 선별해서 메모리 컨텍스트
+        context_messages = self.__select_context(chat_log, query_vector)
+
+        # 유저 질의 템플릿
+        user_template = HumanMessagePromptTemplate.from_template('''{query}''')
+
+        # 프롬프트 템플릿 묶기
+        chat_prompt_template = ChatPromptTemplate.from_messages([system_role, *context_messages, user_template])
         # 질의 응답
-        answer = self.__talk2gpt(capsuled_messages)
-        answer_vector = self.get_embedding(answer)
+        answer = self.__talk2gpt(chat_prompt_template, {'query': query})
+        # 응답 벡터화
+        answer_vector = self.embeddings_model.embed_query(answer)
 
         return answer, query_vector, answer_vector
 
@@ -124,7 +127,7 @@ class Chatbot():
         def inner(question: str, answer: str) -> Tuple[int, str, str, str, str]:
             test_paper = test(question)
 
-            text = f'''점수와 피드백 부분을 채워줘. 점수는 100점 만점으로 해줘.
+            instruction = '''점수와 피드백 부분을 채워줘. 점수는 100점 만점으로 해줘.
             문제: 반복문이란 무엇인가?
             풀이: 반복문은 반복하는 명령문이다.
             답: 반복문이란 프로그램 내에서 똑같은 명령을 일정 횟수만큼 반복하여 수행하도록 제어하는 명령문입니다.
@@ -138,8 +141,10 @@ class Chatbot():
             답: {answer}
             점수와 피드백: '''
 
-            capsuled_messages = self.__capsule_message(text)
-            evaluation = self.__talk2gpt(capsuled_messages)
+            # 프롬프트 템플릿
+            chat_prompt = ChatPromptTemplate.from_template(instruction)
+            # 질의 응답
+            evaluation = self.__talk2gpt(chat_prompt, {'question': question, 'test_paper': test_paper, 'answer': answer})
 
             idx = evaluation.find(':')
             try:
@@ -153,16 +158,11 @@ class Chatbot():
         return inner
 
     def test(self, chat_log: List[Exchange]) -> Callable:
-        prompt_messages = [
-            {"role": "system", "content": f'''너는 지금부터 사용자가 말해준 내용으로 시험을 보는 학생 ai 야.
+        instruction = '''너는 지금부터 사용자가 말해준 내용으로 시험을 보는 학생 ai 야.
                 사용자가 말한 내용 안에서만 대답을 해.
-                사용자가 언급하지 않은 내용이 시험 문제로 나오면 "모르겠어요"라고 대답해.'''}]
+                사용자가 언급하지 않은 내용이 시험 문제로 나오면 "모르겠어요"라고 대답해.'''
 
         def inner(question: str) -> str:
-            answer, _, _ = self.chat(question, chat_log, prompt_messages)
+            answer, _, _ = self.chat(question, chat_log, instruction)
             return answer
         return inner
-
-    def get_embedding(self, text: str, model="text-embedding-ada-002") -> Vector:
-        text = text.replace("\n", " ")
-        return self.client.embeddings.create(input=[text], model=model).data[0].embedding

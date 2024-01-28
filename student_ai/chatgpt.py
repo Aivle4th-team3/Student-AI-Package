@@ -4,7 +4,7 @@ from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, HumanMess
 from langchain_core.output_parsers import StrOutputParser
 import numpy as np
 from dataclasses import dataclass
-from typing import List, Tuple, Dict, Callable
+from typing import List, Tuple, Callable
 
 
 Vector = List[float]
@@ -48,10 +48,10 @@ class Chatbot():
 
     # 코사인 유사도 비교
     def __measure_similarity(self, chat_log: List[Exchange], target_vector: Vector) -> Vector:
-        embedded_history = np.array([exchange.sender_vector for exchange in chat_log] + [
-                                    exchange.receiver_vector for exchange in chat_log])
-        # 각 임베딩된 벡터의 크기가 1이므로 분모 생략
-        cosine_similarity = np.dot(embedded_history, target_vector)
+        embedded_history = np.array([exchange.sender_vector for exchange in chat_log] +
+                                    [exchange.receiver_vector for exchange in chat_log])
+
+        cosine_similarity = np.dot(embedded_history, target_vector) / (np.linalg.norm(embedded_history, axis=1) * np.linalg.norm(target_vector))
 
         return cosine_similarity
 

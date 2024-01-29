@@ -1,4 +1,5 @@
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -21,14 +22,27 @@ class Exchange():
 class Chatbot():
     client = None
 
-    def __init__(self, api_key, is_test=False):
+    def __init__(self, ai_model, api_key, is_test=False):
         self.is_test = is_test
-        self.llm = ChatOpenAI(
-            api_key=api_key,
-            model='gpt-4',
-            temperature=0.5,
-        )
-        self.embeddings_model = OpenAIEmbeddings(api_key=api_key)
+        if ai_model == "OPENAI":
+            self.llm = ChatOpenAI(
+                api_key=api_key,
+                model="gpt-4",
+                temperature=0.5,
+            )
+            self.embeddings_model = OpenAIEmbeddings(
+                api_key=api_key
+            )
+
+        elif ai_model == "GEMINI":
+            self.llm = GoogleGenerativeAI(
+                model="gemini-pro",
+                google_api_key=api_key,
+            )
+            self.embeddings_model = GoogleGenerativeAIEmbeddings(
+                model="models/embedding-001",
+                google_api_key=api_key
+            )
 
     def __talk2gpt(self, templates: List[PromptTemplate], placeholder, output_parser=StrOutputParser()) -> str:
         if not self.is_test:

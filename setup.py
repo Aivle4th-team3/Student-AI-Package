@@ -6,7 +6,7 @@ with open('README.md', 'r', encoding='utf-8') as fh:
 
 setup(
     name='student-ai',
-    version='0.3.1',
+    version='0.3.3',
     description='Package that bundles student AI functions',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -15,6 +15,7 @@ setup(
     install_requires=[
         'langchain',
         'langchain-openai',
+        'langchain-google-genai',
         'tiktoken',
     ],
 )

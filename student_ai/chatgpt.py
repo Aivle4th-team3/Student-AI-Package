@@ -1,5 +1,7 @@
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_google_genai import GoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_community.llms import HuggingFaceEndpoint
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -22,26 +24,38 @@ class Exchange():
 class Chatbot():
     client = None
 
-    def __init__(self, ai_model, api_key, is_test=False):
+    def __init__(self, provider, model, api_key, is_test=False):
         self.is_test = is_test
-        if ai_model == "OPENAI":
+        if provider == "OPENAI":
             self.llm = ChatOpenAI(
                 api_key=api_key,
-                model="gpt-4",
+                model=model,
                 temperature=0.5,
             )
             self.embeddings_model = OpenAIEmbeddings(
                 api_key=api_key
             )
 
-        elif ai_model == "GEMINI":
+        elif provider == "GEMINI":
             self.llm = GoogleGenerativeAI(
-                model="gemini-pro",
+                model=model,
                 google_api_key=api_key,
             )
             self.embeddings_model = GoogleGenerativeAIEmbeddings(
                 model="models/embedding-001",
                 google_api_key=api_key
+            )
+
+        elif provider == 'HUGGINGFACE':
+            self.llm = HuggingFaceEndpoint(
+                repo_id=model,
+                huggingfacehub_api_token=api_key,
+                temperature=0.5,
+            )
+            self.embeddings_model = HuggingFaceEmbeddings(
+                model_name='jhgan/ko-sroberta-nli',
+                model_kwargs={'device': 'cpu'},
+                encode_kwargs={'normalize_embeddings': True},
             )
 
     def __talk2gpt(self, templates: List[PromptTemplate], placeholder, output_parser=StrOutputParser()) -> str:

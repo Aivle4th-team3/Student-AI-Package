@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_google_genai import GoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-from langchain_community.llms import HuggingFaceEndpoint
+from langchain_community.llms import Ollama, HuggingFaceEndpoint
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AIMessage
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, HumanMessagePromptTemplate
@@ -24,36 +24,48 @@ class Exchange():
 class Chatbot():
     client = None
 
-    def __init__(self, provider, model, api_key, is_test=False):
+    def __init__(self,
+                 llm_provider, llm_model, llm_api_key,
+                 embedding_provider, embedding_model, embedding_api_key,
+                 is_test=False):
+
         self.is_test = is_test
-        if provider == "OPENAI":
+
+        # llm 모델 선택
+        if llm_provider == "OPENAI":
             self.llm = ChatOpenAI(
-                api_key=api_key,
-                model=model,
+                api_key=llm_api_key,
+                model=llm_model,
                 temperature=0.5,
             )
-            self.embeddings_model = OpenAIEmbeddings(
-                api_key=api_key
-            )
-
-        elif provider == "GEMINI":
+        elif llm_provider == "GEMINI":
             self.llm = GoogleGenerativeAI(
-                model=model,
-                google_api_key=api_key,
-            )
-            self.embeddings_model = GoogleGenerativeAIEmbeddings(
-                model="models/embedding-001",
-                google_api_key=api_key
-            )
-
-        elif provider == 'HUGGINGFACE':
-            self.llm = HuggingFaceEndpoint(
-                repo_id=model,
-                huggingfacehub_api_token=api_key,
+                model=llm_model,
+                google_api_key=llm_api_key,
                 temperature=0.5,
             )
+        elif llm_provider == 'HUGGINGFACE':
+            self.llm = HuggingFaceEndpoint(
+                repo_id=llm_model,
+                huggingfacehub_api_token=llm_api_key,
+                temperature=0.5,
+            )
+        elif llm_provider == "OLLAMA":
+            self.llm = Ollama(model=llm_model)
+
+        # embedding 모델 선택
+        if embedding_provider == "OPENAI":
+            self.embeddings_model = OpenAIEmbeddings(
+                api_key=embedding_api_key
+            )
+        elif embedding_provider == "GEMINI":
+            self.embeddings_model = GoogleGenerativeAIEmbeddings(
+                model=embedding_model,
+                google_api_key=embedding_api_key
+            )
+        elif embedding_provider == "HUGGINGFACE":
             self.embeddings_model = HuggingFaceEmbeddings(
-                model_name='jhgan/ko-sroberta-nli',
+                model_name=embedding_model,
                 model_kwargs={'device': 'cpu'},
                 encode_kwargs={'normalize_embeddings': True},
             )

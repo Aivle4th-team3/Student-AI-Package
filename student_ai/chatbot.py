@@ -7,6 +7,7 @@ from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, HumanMess
 from langchain_core.output_parsers import StrOutputParser
 from .vectorstore import VectorStoreBuilder
 import os, json
+import importlib.resources as pkg_resources
 from dotenv import load_dotenv
 from typing import List, Tuple, Callable
 
@@ -25,7 +26,7 @@ class Chatbot():
 
         self.is_test = is_test
 
-        with open("template_text.json", "r") as file:
+        with pkg_resources.open_text(__package__, "template_text.json", encoding="utf-8") as file:
             self.template_text = json.load(file)
 
         # llm 모델 선택
@@ -63,7 +64,7 @@ class Chatbot():
         # 벡터데이터베이스
         self.VectorStore = VectorStoreBuilder(vectorstore_provider, self.embeddings_model)
 
-    def __talk2gpt(self, templates: List[PromptTemplate], placeholder, output_parser=StrOutputParser()) -> str:
+    def __talk2bot(self, templates: List[PromptTemplate], placeholder, output_parser=StrOutputParser()) -> str:
         if not self.is_test:
             try:
                 # 체이닝
@@ -112,7 +113,7 @@ class Chatbot():
         # 프롬프트 템플릿 묶기
         chat_prompt_template = ChatPromptTemplate.from_messages([system_role, *context_messages, user_template])
         # 질의 응답
-        answer = self.__talk2gpt(chat_prompt_template, {'query': query})
+        answer = self.__talk2bot(chat_prompt_template, {'query': query})
 
         # 벡터데이터베이스에 질의 저장
         self.VectorStore('human'+tablename).add_texts([query])
@@ -142,7 +143,7 @@ class Chatbot():
             # 프롬프트 템플릿
             chat_prompt = ChatPromptTemplate.from_template(instruction)
             # 질의 응답
-            point, explain = self.__talk2gpt(
+            point, explain = self.__talk2bot(
                 templates=chat_prompt,
                 placeholder={'question': question, 'test_paper': test_paper, 'answer': answer},
                 output_parser=self.__evaluation_parser

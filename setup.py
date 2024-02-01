@@ -6,12 +6,15 @@ with open('README.md', 'r', encoding='utf-8') as fh:
 
 setup(
     name='student-ai',
-    version='0.4.2',
+    version='0.4.3',
     description='Package that bundles student AI functions',
-    long_description=open('README.md').read(),
+    long_description=open('README.md', encoding='utf-8').read(),
     long_description_content_type='text/markdown',
     author='aivle-4th-team3',
     packages=find_packages(),
+    package_data={
+        'student_ai': ['template_text.json'],
+    },
     install_requires=[
         'python-dotenv',
         'langchain',

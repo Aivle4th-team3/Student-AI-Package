@@ -13,6 +13,7 @@ setup(
     author='aivle-4th-team3',
     packages=find_packages(),
     install_requires=[
+        'python-dotenv',
         'langchain',
         'langchain-openai',
         'langchain-google-genai',

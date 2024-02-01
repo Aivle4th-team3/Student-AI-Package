@@ -6,8 +6,11 @@ from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage, AI
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from .vectorstore import VectorStoreBuilder
+import os
+from dotenv import load_dotenv
 from typing import List, Tuple, Callable
 
+load_dotenv()
 Vector = List[float]
 
 
@@ -15,9 +18,9 @@ class Chatbot():
     client = None
 
     def __init__(self,
-                 llm_provider, llm_model, llm_api_key,
-                 embedding_provider, embedding_model, embedding_api_key,
-                 vectorstore_provider, vectorstore_api_key,
+                 llm_provider,
+                 embedding_provider,
+                 vectorstore_provider,
                  is_test=False):
 
         self.is_test = is_test
@@ -25,44 +28,37 @@ class Chatbot():
         # llm 모델 선택
         if llm_provider == "OPENAI":
             self.llm = ChatOpenAI(
-                api_key=llm_api_key,
-                model=llm_model,
+                model=os.getenv("OPENAI_LLM_MODEL"),
                 temperature=0.5,
             )
-        elif llm_provider == "GEMINI":
+        elif llm_provider == "GOOGLE":
             self.llm = GoogleGenerativeAI(
-                model=llm_model,
-                google_api_key=llm_api_key,
+                model=os.getenv("GOOGLE_LLM_MODEL"),
                 temperature=0.5,
             )
-        elif llm_provider == 'HUGGINGFACE':
+        elif llm_provider == "HUGGINGFACEHUB":
             self.llm = HuggingFaceEndpoint(
-                repo_id=llm_model,
-                huggingfacehub_api_token=llm_api_key,
+                repo_id=os.getenv("HUGGINGFACEHUB_LLM_MODEL"),
                 temperature=0.5,
             )
         elif llm_provider == "OLLAMA":
-            self.llm = Ollama(model=llm_model)
+            self.llm = Ollama(model=os.getenv("OLLAMA_LLM_MODEL"))
 
         # embedding 모델 선택
         if embedding_provider == "OPENAI":
-            self.embeddings_model = OpenAIEmbeddings(
-                api_key=embedding_api_key
-            )
-        elif embedding_provider == "GEMINI":
+            self.embeddings_model = OpenAIEmbeddings()
+        elif embedding_provider == "GOOGLE":
             self.embeddings_model = GoogleGenerativeAIEmbeddings(
-                model=embedding_model,
-                google_api_key=embedding_api_key
-            )
-        elif embedding_provider == "HUGGINGFACE":
+                model=os.getenv("GOOGLE_EMBEDDING_MODEL"))
+        elif embedding_provider == "HUGGINGFACEHUB":
             self.embeddings_model = HuggingFaceEmbeddings(
-                model_name=embedding_model,
+                model_name=os.getenv("HUGGINGFACEHUB_EMBEDDING_MODEL"),
                 model_kwargs={'device': 'cpu'},
                 encode_kwargs={'normalize_embeddings': True},
             )
 
         # 벡터데이터베이스
-        self.VectorStore = VectorStoreBuilder(vectorstore_provider, vectorstore_api_key, self.embeddings_model)
+        self.VectorStore = VectorStoreBuilder(vectorstore_provider, self.embeddings_model)
 
     def __talk2gpt(self, templates: List[PromptTemplate], placeholder, output_parser=StrOutputParser()) -> str:
         if not self.is_test:
@@ -72,6 +68,7 @@ class Chatbot():
                 # 질의 응답
                 answer = chain.invoke(placeholder)
             except Exception as ex:
+                print(ex)
                 if ex.code == "insufficient_quota":
                     answer = "죄송해요! API키 사용량 터졌어요!"
                 else:

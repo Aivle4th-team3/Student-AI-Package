@@ -2,7 +2,7 @@ from langchain_community.vectorstores import Chroma, FAISS
 from langchain_pinecone import Pinecone
 
 
-def VectorStoreBuilder(provider, api_key, embeddings_model):
+def VectorStoreBuilder(provider, embeddings_model):
     stores = {}
 
     def inner(tablename):
@@ -30,7 +30,6 @@ def VectorStoreBuilder(provider, api_key, embeddings_model):
             elif provider == "PINECONE":
                 try:
                     db = Pinecone(
-                        pinecone_api_key=api_key,
                         index_name="ai-student",
                         embedding=embeddings_model,
                         namespace=tablename,
@@ -38,7 +37,6 @@ def VectorStoreBuilder(provider, api_key, embeddings_model):
                 except Exception:
                     db = Pinecone.from_texts(
                         texts=[""],
-                        pinecone_api_key=api_key,
                         index_name="ai-student",
                         embedding=embeddings_model,
                         namespace=tablename,

@@ -1,18 +1,19 @@
 from langchain_community.vectorstores import Chroma, FAISS
+from langchain_pinecone import Pinecone
 
 
-def VectorStoreBuilder(vectorstore_provider, embeddings_model):
+def VectorStoreBuilder(provider, api_key, embeddings_model):
     stores = {}
 
     def inner(tablename):
         if tablename not in stores:
-            if vectorstore_provider == "Chroma":
+            if provider == "Chroma":
                 db = Chroma(
                     persist_directory="./db/chromadb",
                     embedding_function=embeddings_model,
                     collection_name=tablename,
                 )
-            elif vectorstore_provider == "FAISS":
+            elif provider == "FAISS":
                 try:
                     db = FAISS.load_local(
                         folder_path="./db/faiss",
@@ -25,6 +26,22 @@ def VectorStoreBuilder(vectorstore_provider, embeddings_model):
                     db.save_local(
                         folder_path="./db/faiss",
                         index_name=tablename
+                    )
+            elif provider == "PINECONE":
+                try:
+                    db = Pinecone(
+                        pinecone_api_key=api_key,
+                        index_name="ai-student",
+                        embedding=embeddings_model,
+                        namespace=tablename,
+                    )
+                except Exception:
+                    db = Pinecone.from_texts(
+                        texts=[""],
+                        pinecone_api_key=api_key,
+                        index_name="ai-student",
+                        embedding=embeddings_model,
+                        namespace=tablename,
                     )
 
             stores[tablename] = db

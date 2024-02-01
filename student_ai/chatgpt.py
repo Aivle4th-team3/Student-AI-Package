@@ -17,7 +17,7 @@ class Chatbot():
     def __init__(self,
                  llm_provider, llm_model, llm_api_key,
                  embedding_provider, embedding_model, embedding_api_key,
-                 vectorstore_provider,
+                 vectorstore_provider, vectorstore_api_key,
                  is_test=False):
 
         self.is_test = is_test
@@ -62,7 +62,7 @@ class Chatbot():
             )
 
         # 벡터데이터베이스
-        self.VectorStore = VectorStoreBuilder(vectorstore_provider, self.embeddings_model)
+        self.VectorStore = VectorStoreBuilder(vectorstore_provider, vectorstore_api_key, self.embeddings_model)
 
     def __talk2gpt(self, templates: List[PromptTemplate], placeholder, output_parser=StrOutputParser()) -> str:
         if not self.is_test:

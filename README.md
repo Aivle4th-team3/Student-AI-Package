@@ -72,7 +72,7 @@ AI
 ├─ .gitignore
 ├─ dist
 ├─ notebooks
-│  ├─ gpt_function.ipynb
+│  ├─ function_calling.ipynb
 │  └─ gradio_chatbot.ipynb
 ├─ README.md
 ├─ setup.py

@@ -1,2 +1,0 @@
-import student_ai.chatgpt
-import student_ai.gemini
